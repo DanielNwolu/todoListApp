@@ -1,194 +1,234 @@
 "use strict";
-// // this  is an example of type and interception
-// type User ={
-//     name:string
-// }
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-// // since types cannot be extended we use intercept to combine types.
-// type CompleteUser= User & {
-//     address:string,
-//     age: number,
-//     sex:"male"|"female"
-// }
-// const userProfile:CompleteUser={
-//     "name":"daniel",
-//     "address":"ifo layout",
-//     "age":23,
-//     "sex":"male"
-// }
-// console.log(userProfile)
-// // Example of extending interfaces.
-// interface UserProfile{
-//     name:string
-// }
-// interface completeUserProfile extends UserProfile{
-//     address:string,
-//     age: number,
-//     sex:"male"|"female",
-//     nationality:string,
-// }
-// const myUserProfile:completeUserProfile={
-//     "name":"daniel",
-//     "address":"ifo layout",
-//     "age":23,
-//     "sex":"male",
-//     "nationality":"Nigeria"
-// }
-// console.log(myUserProfile)
-// Import required Node.js types
-const process_1 = __importDefault(require("process"));
+const uuid_1 = require("uuid");
+const readline = __importStar(require("readline"));
+const fs = __importStar(require("fs"));
+const store = "todos.json";
 class TodoList {
     constructor() {
         this.todos = [];
-        this.nextId = 1;
+        this.loadTodos();
     }
+    saveTodos() {
+        fs.writeFileSync(store, JSON.stringify(this.todos, null, 2), "utf-8");
+    }
+    loadTodos() {
+        if (fs.existsSync(store)) {
+            const data = fs.readFileSync(store, "utf-8");
+            this.todos = JSON.parse(data);
+        }
+    }
+    // function to add a new task
     addTodo(task, dueDate) {
+        if (!task.trim()) {
+            throw new InvalidTaskDescriptionError("Task description cannot be empty");
+        }
+        if (isNaN(new Date(dueDate).getTime())) {
+            throw new InvalidDueDateError("Invalid due date");
+        }
         const newTodo = {
-            id: this.nextId++,
-            task,
+            id: (0, uuid_1.v4)(),
+            task: { description: task },
             completed: false,
             dueDate,
         };
         this.todos.push(newTodo);
+        this.saveTodos();
+        return true;
     }
+    //function to switch todo from pending to completed
     completeTodo(id) {
-        const todo = this.findTodoById(id);
+        const todo = this.todos.find((t) => t.id === id);
+        if (!todo) {
+            throw new TaskNotFoundError(`Todo with id ${id} not found.`);
+        }
         todo.completed = true;
+        this.saveTodos();
+        return true;
     }
     removeTodo(id) {
-        const index = this.findTodoIndexById(id);
-        this.todos.splice(index, 1);
-    }
-    listTodos(filter) {
-        switch (filter) {
-            case 'completed':
-                return this.todos.filter(t => t.completed);
-            case 'pending':
-                return this.todos.filter(t => !t.completed);
-            default:
-                return [...this.todos];
+        const initialLength = this.todos.length;
+        this.todos = this.todos.filter((t) => t.id !== id);
+        if (this.todos.length === initialLength) {
+            throw new TaskNotFoundError(`Todo with id ${id} not found.`);
         }
+        this.saveTodos();
+        return true;
     }
-    updateTodoTask(id, newTask) {
-        const todo = this.findTodoById(id);
-        todo.task = newTask;
+    clearCompletedTasks() {
+        this.todos = this.todos.filter((t) => !t.completed);
+        this.saveTodos();
+        console.log("Completed tasks cleared.");
     }
-    clearCompletedTodos() {
-        this.todos = this.todos.filter(t => !t.completed);
+    listTodos() {
+        if (this.todos.length === 0) {
+            console.log("No tasks available.");
+            return;
+        }
+        console.log("\nAll Tasks:");
+        this.todos.forEach(({ id, task, completed, dueDate }, index) => {
+            console.log(`${index + 1}. [${completed ? "✔" : " "}] ${task.description} (Due: ${dueDate}) - ID: ${id}`);
+        });
     }
-    findTodoById(id) {
-        const todo = this.todos.find(t => t.id === id);
-        if (!todo)
-            throw new Error(`Todo with ID ${id} not found`);
-        return todo;
+    listCompletedTasks() {
+        const completedTasks = this.todos.filter((t) => t.completed);
+        if (completedTasks.length === 0) {
+            console.log("No completed tasks.");
+            return;
+        }
+        console.log("\nCompleted Tasks:");
+        completedTasks.forEach(({ id, task, dueDate }, index) => {
+            console.log(`${index + 1}. ✔ ${task.description} (Due: ${dueDate}) - ID: ${id}`);
+        });
     }
-    findTodoIndexById(id) {
-        const index = this.todos.findIndex(t => t.id === id);
-        if (index === -1)
-            throw new Error(`Todo with ID ${id} not found`);
-        return index;
+    listUndoneTasks() {
+        const undoneTasks = this.todos.filter((t) => !t.completed);
+        if (undoneTasks.length === 0) {
+            console.log("No pending tasks.");
+            return;
+        }
+        console.log("\nPending Tasks:");
+        undoneTasks.forEach(({ id, task, dueDate }, index) => {
+            console.log(`${index + 1}.  ${task.description} (Due: ${dueDate}) - ID: ${id}`);
+        });
     }
 }
-// CLI Implementation
+// different error responses
+class TaskNotFoundError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "TaskNotFoundError";
+    }
+}
+class InvalidTaskDescriptionError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "InvalidTaskDescriptionError";
+    }
+}
+class InvalidDueDateError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "InvalidDueDateError";
+    }
+}
+// CLI Interaction with my App
 const todoList = new TodoList();
-const [, , command, ...args] = process_1.default.argv;
-function displayTodos(todos) {
-    if (todos.length === 0) {
-        console.log("No todos found");
-        return;
-    }
-    todos.forEach(todo => {
-        const status = todo.completed ? '[x]' : '[ ]';
-        const dueDate = todo.dueDate.toISOString().split('T')[0];
-        console.log(`${status} ${todo.id}: ${todo.task} (Due: ${dueDate})`);
-    });
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+});
+function showMenu() {
+    console.log("\n*** Todo List App *** ");
+    console.log("1. Add Todo");
+    console.log("2. Complete Todo");
+    console.log("3. Remove Todo");
+    console.log("4. List All Todo's");
+    console.log("5. Clear Completed Todo's");
+    console.log("6. List Completed Todo's");
+    console.log("7. List Pending Todo's");
+    console.log("8. Exit");
 }
-try {
-    switch (command) {
-        case 'add':
-            const [task, dueDateString] = args;
-            if (!task || !dueDateString) {
-                console.error('Usage: add <task> <dueDate (YYYY-MM-DD)>');
-                process_1.default.exit(1);
-            }
-            const dueDate = new Date(dueDateString);
-            if (isNaN(dueDate.getTime())) {
-                console.error('Invalid date format. Use YYYY-MM-DD');
-                process_1.default.exit(1);
-            }
-            todoList.addTodo(task, dueDate);
-            console.log('Todo added successfully');
+function handleMenu(choice) {
+    switch (choice) {
+        case "1":
+            rl.question("Enter task description: ", (description) => {
+                rl.question("Enter due date (YYYY-MM-DD): ", (dateInput) => {
+                    try {
+                        todoList.addTodo(description, dateInput);
+                        console.log("Task added successfully.");
+                    }
+                    catch (error) {
+                        console.error(error.message);
+                    }
+                    main();
+                });
+            });
             break;
-        case 'complete':
-            const id = parseInt(args[0]);
-            if (isNaN(id)) {
-                console.error('Usage: complete <id>');
-                process_1.default.exit(1);
-            }
-            try {
-                todoList.completeTodo(id);
-                console.log(`Todo ${id} marked as complete`);
-            }
-            catch (error) {
-                console.error(error instanceof Error ? error.message : 'Unknown error');
-                process_1.default.exit(1);
-            }
+        case "2":
+            rl.question("Enter task ID to mark as complete: ", (id) => {
+                try {
+                    todoList.completeTodo(id);
+                    console.log("Task marked as completed.");
+                }
+                catch (error) {
+                    console.error(error.message);
+                }
+                main();
+            });
             break;
-        case 'remove':
-            const removeId = parseInt(args[0]);
-            if (isNaN(removeId)) {
-                console.error('Usage: remove <id>');
-                process_1.default.exit(1);
-            }
-            try {
-                todoList.removeTodo(removeId);
-                console.log(`Todo ${removeId} removed`);
-            }
-            catch (error) {
-                console.error(error instanceof Error ? error.message : 'Unknown error');
-                process_1.default.exit(1);
-            }
+        case "3":
+            rl.question("Enter task ID to remove: ", (id) => {
+                try {
+                    todoList.removeTodo(id);
+                    console.log("Task removed successfully.");
+                }
+                catch (error) {
+                    console.error(error.message);
+                }
+                main();
+            });
             break;
-        case 'list':
-            const filter = args[0] || 'all';
-            const todos = todoList.listTodos(filter);
-            displayTodos(todos);
+        case "4":
+            todoList.listTodos();
+            main();
             break;
-        case 'update':
-            const [updateId, ...taskParts] = args;
-            const newTask = taskParts.join(' ');
-            if (!updateId || !newTask) {
-                console.error('Usage: update <id> <new task>');
-                process_1.default.exit(1);
-            }
-            try {
-                todoList.updateTodoTask(parseInt(updateId), newTask);
-                console.log(`Todo ${updateId} updated`);
-            }
-            catch (error) {
-                console.error(error instanceof Error ? error.message : 'Unknown error');
-                process_1.default.exit(1);
-            }
+        case "5":
+            todoList.clearCompletedTasks();
+            main();
             break;
-        case 'clear-completed':
-            todoList.clearCompletedTodos();
-            console.log('Completed todos cleared');
+        case "6":
+            todoList.listCompletedTasks();
+            main();
+            break;
+        case "7":
+            todoList.listUndoneTasks();
+            main();
+            break;
+        case "8":
+            console.log("Goodbye!");
+            rl.close();
             break;
         default:
-            console.log(`Available commands:
-  add <task> <dueDate>    Add new todo
-  complete <id>           Mark todo as complete
-  remove <id>             Remove todo
-  list [filter]           List todos (all|completed|pending)
-  update <id> <new task>  Update todo task
-  clear-completed         Clear all completed todos`);
-            break;
+            console.log("Invalid choice. Please try again.");
+            main();
     }
 }
-catch (error) {
-    console.error(error instanceof Error ? error.message : 'Unknown error');
-    process_1.default.exit(1);
+function main() {
+    showMenu();
+    rl.question("Choose an option: ", handleMenu);
 }
+main();

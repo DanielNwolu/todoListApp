@@ -1,0 +1,10 @@
+[
+  {
+    "id": "8fdf3930-fff0-4035-a5b1-978e8eb90999",
+    "task": {
+      "description": "My first todo"
+    },
+    "completed": false,
+    "dueDate": "2023-4-5"
+  }
+]
